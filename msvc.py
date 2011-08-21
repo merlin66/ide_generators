@@ -155,11 +155,19 @@ class Project():
 
         self.guid = _generateGUID(filepath, name)
 
-    def get_tool_info(self, tool):
-        try:
-            return self.project_info[tool]
-        except KeyError:
-            return dict()
+    def get_tool_info(self, tool, variant, arch):
+        possible_keys = [
+            '%s|%s|%s' % (tool, variant, arch),
+            '%s|%s' % (tool,variant),
+            '%s|%s' % (tool,arch),
+            tool,
+            ]
+        for key in possible_keys:
+            try:
+                return self.project_info[key]
+            except KeyError:
+                pass
+        return dict()
 
 def _add_file_nodes(parent_node, filemap, project_path):
     filters = { '' : parent_node } # Parent of the empty filter
@@ -242,7 +250,7 @@ def write_project(version, project, out):
             )
             tools = configuration_tools[project.configuration_type]
             for tool in tools:
-                d = project.get_tool_info(tool)
+                d = project.get_tool_info(tool, variant, arch)
                 tool = ET.SubElement(configuration, 'Tool', Name = tool, **d)
 
     references = ET.SubElement(xml_project, 'References')
