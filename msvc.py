@@ -142,11 +142,12 @@ def _generateGUID(slnfile, name):
     return solution
 
 class Project():
-    def __init__(self, filepath, archs, variants, files, project_type, name = None):
+    def __init__(self, filepath, archs, variants, files, project_info, name = None):
         self.filepath = filepath
         self.archs = archs
         self.variants = variants
-        self.configuration_type = project_type
+        self.project_info = project_info
+        self.configuration_type = project_info['project_type']
         self.files = files
         self.name = name
         if name is None:
@@ -155,7 +156,10 @@ class Project():
         self.guid = _generateGUID(filepath, name)
 
     def get_tool_info(self, tool):
-        return dict()
+        try:
+            return self.project_info[tool]
+        except KeyError:
+            return dict()
 
 def _add_file_nodes(parent_node, filemap, project_path):
     filters = { '' : parent_node } # Parent of the empty filter
@@ -312,12 +316,25 @@ def _get_test_projects(variants, archs):
                      ],
         ''         : ['README.txt']
     }
+
+
+    project_info = {
+        'project_type' : 'Makefile',
+        #'project_type' : 'Application',
+
+        'VCNMakeTool' : dict(
+            BuildCommandLine="scons.bat",
+            CleanCommandLine="scons.bat -c",
+            RebuildCommandLine="scons.bat -c && scons.bat",
+            Output="foo.exe",
+            ),
+    }
+
     projects = [ Project(filepath = p,
                          variants = variants,
                          archs = archs,
                          files = files,
-                         #project_type = 'Makefile',
-                         project_type = 'Application',
+                         project_info = project_info,
                          ) for p in project_files ]
 
     dependencies = {
