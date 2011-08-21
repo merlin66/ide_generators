@@ -160,6 +160,7 @@ class Project():
 def _add_file_nodes(parent_node, filemap, project_path):
     filters = { '' : parent_node } # Parent of the empty filter
     def get_filterparent(total_filter):
+        assert total_filter != '/', 'Illegal input'
         if total_filter in filters:
             return filters[total_filter]
         result = os.path.split(total_filter)
@@ -187,13 +188,17 @@ def _add_file_nodes(parent_node, filemap, project_path):
             if filetype_first:
                 total_filter = type_filter
                 if subfolder:
-                    total_filter += '/' + subfolder
+                    if total_filter:
+                        total_filter += '/'
+                    total_filter += subfolder
             else:
                 total_filter = ''
                 if subfolder:
-                    total_filter += '/' + subfolder
+                    total_filter += subfolder
                 if type_filter:
-                    total_filter += '/' + type_filter
+                    if total_filter:
+                        total_filter += '/'
+                    total_filter += type_filter
 
             filterparent = get_filterparent(total_filter)
             relative = os.path.relpath(filepath.replace('/', '\\'), os.path.split(project_path)[0])
