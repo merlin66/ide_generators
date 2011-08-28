@@ -228,7 +228,7 @@ def write_project(version, project, out):
         Version                = '{0:.2f}'.format(version),
         name                   = project.name,
         ProjectGUID            = project.guid,
-        TargetFrameworkVersion = '131072'    
+        TargetFrameworkVersion = '131072'
     )
 
     platforms = ET.SubElement(xml_project, 'Platforms')
