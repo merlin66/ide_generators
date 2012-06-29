@@ -142,7 +142,7 @@ def _generateGUID(slnfile, name):
     return solution
 
 class Project():
-    def __init__(self, filepath, archs, variants, files, project_info, name = None):
+    def __init__(self, filepath, archs, variants, files, project_info, name = None, src_root = None):
         self.filepath = filepath
         self.archs = archs
         self.variants = variants
@@ -150,6 +150,7 @@ class Project():
         self.configuration_type = project_info['project_type']
         self.files = files
         self.name = name
+        self.src_root = src_root
         if name is None:
             self.name = os.path.splitext(os.path.split(filepath)[-1])[0]
 
@@ -169,7 +170,7 @@ class Project():
                 pass
         return dict()
 
-def _add_file_nodes(parent_node, filemap, project_path):
+def _add_file_nodes(parent_node, filemap, project_path, src_root):
     filters = { '' : parent_node } # Parent of the empty filter
     def get_filterparent(total_filter):
         assert total_filter != '/', 'Illegal input'
@@ -213,7 +214,10 @@ def _add_file_nodes(parent_node, filemap, project_path):
                     total_filter += type_filter
 
             filterparent = get_filterparent(total_filter)
-            relative = os.path.relpath(filepath.replace('/', '\\'), os.path.split(project_path)[0])
+            if src_root is not None:
+                filepath = os.path.join(src_root, filepath)
+            filepath = filepath.replace('/', '\\')
+            relative = os.path.relpath(filepath, os.path.split(project_path)[0])
             ET.SubElement(filterparent, 'File', RelativePath = relative)
     else:
         #TODO: are projects without files valid?
@@ -256,7 +260,7 @@ def write_project(version, project, out):
     references = ET.SubElement(xml_project, 'References')
     files = ET.SubElement(xml_project, 'Files')
     if project.files:
-        _add_file_nodes(parent_node = files, filemap = project.files, project_path = project.filepath)
+        _add_file_nodes(parent_node = files, filemap = project.files, project_path = project.filepath, src_root = project.src_root)
 
     xml_globals = ET.SubElement(xml_project, 'Globals')
 
