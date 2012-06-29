@@ -142,7 +142,7 @@ def _generateGUID(slnfile, name):
     return solution
 
 class Project():
-    def __init__(self, filepath, archs, variants, files, project_info, name = None, src_root = None):
+    def __init__(self, filepath, archs, variants, files, project_info, name = None, src_root = None, strip_path = None):
         self.filepath = filepath
         self.archs = archs
         self.variants = variants
@@ -151,6 +151,7 @@ class Project():
         self.files = files
         self.name = name
         self.src_root = src_root
+        self.strip_path = strip_path
         if name is None:
             self.name = os.path.splitext(os.path.split(filepath)[-1])[0]
 
@@ -170,7 +171,7 @@ class Project():
                 pass
         return dict()
 
-def _add_file_nodes(parent_node, filemap, project_path, src_root):
+def _add_file_nodes(parent_node, filemap, project_path, src_root, strip_path):
     filters = { '' : parent_node } # Parent of the empty filter
     def get_filterparent(total_filter):
         assert total_filter != '/', 'Illegal input'
@@ -191,6 +192,14 @@ def _add_file_nodes(parent_node, filemap, project_path, src_root):
 
     filetype_first = True
 
+    def strip_folder(subfolder, strip_path):
+        if strip_path is None:
+            return subfolder
+        strip_path = strip_path.replace('/', '\\') # TODO: slash consistency
+        assert subfolder.startswith(strip_path)
+        result = subfolder[len(strip_path)+1:]
+        return result
+
     for f in filemap:
         type_filter = f
         for filepath in filemap[f]:
@@ -198,6 +207,7 @@ def _add_file_nodes(parent_node, filemap, project_path, src_root):
             subfolder = None
             if len(result) > 1:
                 subfolder = result[0]
+            subfolder = strip_folder(subfolder, strip_path)
             if filetype_first:
                 total_filter = type_filter
                 if subfolder:
@@ -260,7 +270,7 @@ def write_project(version, project, out):
     references = ET.SubElement(xml_project, 'References')
     files = ET.SubElement(xml_project, 'Files')
     if project.files:
-        _add_file_nodes(parent_node = files, filemap = project.files, project_path = project.filepath, src_root = project.src_root)
+        _add_file_nodes(parent_node = files, filemap = project.files, project_path = project.filepath, src_root = project.src_root, strip_path = project.strip_path)
 
     xml_globals = ET.SubElement(xml_project, 'Globals')
 
