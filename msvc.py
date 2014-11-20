@@ -349,6 +349,8 @@ def _get_test_projects(variants, archs):
             CleanCommandLine="scons.bat -c",
             RebuildCommandLine="scons.bat -c && scons.bat",
             Output="foo.exe",
+            PreprocessorDefinitions="FOO;BAR",
+            IncludeSearchPath="C:/foo",
             ),
     }
 
