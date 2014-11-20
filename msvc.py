@@ -399,15 +399,21 @@ def generate_xml_vc10(version, project):
     text_files, header_files, cl_files = get_file_groups(filemap)
 
     # Text, ClCompile and ClInclude files
-    ig = ET.SubElement(xml_project, 'ItemGroup')
-    for p in text_files:
-        node = ET.SubElement(ig, 'Text', Include = p)
-    ig = ET.SubElement(xml_project, 'ItemGroup')
-    for p in cl_files:
-        node = ET.SubElement(ig, 'ClCompile', Include = p)
-    ig = ET.SubElement(xml_project, 'ItemGroup')
-    for p in header_files:
-        node = ET.SubElement(ig, 'ClInclude', Include = p)
+    groups = {
+        'Text' : text_files,
+        'ClCompile' : cl_files,
+        'ClInclude' : header_files,
+    }
+    src_root = project.src_root
+    project_path = project.filepath
+    for g in groups.keys():
+        ig = ET.SubElement(xml_project, 'ItemGroup')
+        for filepath in groups[g]:
+            if src_root is not None:
+                filepath = os.path.join(src_root, filepath)
+            filepath = filepath.replace('/', '\\')
+            relative = os.path.relpath(filepath, os.path.split(project_path)[0])
+            node = ET.SubElement(ig, g, Include=relative)
 
     # targets
     targets = ET.SubElement(xml_project, 'Import', Project="$(VCTargetsPath)\Microsoft.Cpp.targets")
@@ -418,25 +424,70 @@ def generate_xml_vc10(version, project):
 def generate_filters_vc10(version, project):
     xml_project = ET.Element('Project', ToolsVersion="4.0", xmlns="http://schemas.microsoft.com/developer/msbuild/2003")
 
-    # First define the set of filters, and list the extensions for each filter
     filemap = project.files
+    project_path = project.filepath
+    src_root = project.src_root
+    strip_path = project.strip_path
+
     text_files, header_files, cl_files = get_file_groups(filemap)
 
-    # For each text file, list the file and its filter (if it has one)
-    ig = ET.SubElement(xml_project, 'ItemGroup')
-    for t in text_files:
-        node = ET.SubElement(ig, 'Text', Include=t)
+    filter_map = {}
+    filters = set()
+    for f in filemap:
+        type_filter = f
+        for filepath in filemap[f]:
+            result = os.path.split(filepath)
+            subfolder = None
+            if len(result) > 1:
+                subfolder = result[0]
+            subfolder = _strip_folder(subfolder, strip_path)
+            filetype_first = True
+            if filetype_first:
+                total_filter = type_filter
+                if subfolder:
+                    if total_filter:
+                        total_filter += '/'
+                    total_filter += subfolder
+            else:
+                total_filter = ''
+                if subfolder:
+                    total_filter += subfolder
+                if type_filter:
+                    if total_filter:
+                        total_filter += '/'
+                    total_filter += type_filter
+            total_filter = total_filter.replace('/', '\\')
+            filter_map[filepath] = total_filter
+            filters.add(total_filter)
 
-    # For each ClCompile file, list the file and its filter
+    # First define the set of filters (can list the extensions for each filter)
     ig = ET.SubElement(xml_project, 'ItemGroup')
-    for c in cl_files:
-        node = ET.SubElement(ig, 'ClCompile', Include=c)
+    for filter in filters:
+        if filter == '':
+            continue
+        fn = ET.SubElement(ig, 'Filter', Include = filter)
+        uid = ET.SubElement(fn, 'UniqueIdentifier')
+        uid.text = _generateGUID(project.filepath, filter)
 
-    # For each ClInclude file, list the file and its filter
-    ig = ET.SubElement(xml_project, 'ItemGroup')
-    for h in header_files:
-        node = ET.SubElement(ig, 'ClInclude', Include=h)
-        # if filter:
+    groups = {
+        'Text' : text_files,
+        'ClCompile' : cl_files,
+        'ClInclude' : header_files,
+    }
+
+    for g in groups.keys():
+        ig = ET.SubElement(xml_project, 'ItemGroup')
+        for filepath in groups[g]:
+            filter = filter_map[filepath]
+            if src_root is not None:
+                filepath = os.path.join(src_root, filepath)
+            filepath = filepath.replace('/', '\\')
+            relative = os.path.relpath(filepath, os.path.split(project_path)[0])
+            node = ET.SubElement(ig, g, Include=relative)
+            if filter:
+                fn = ET.SubElement(node, 'Filter')
+                fn.text = filter
+
     return xml_project
 
 def write_xml(xml, filepath, encoding, pretty):
@@ -455,7 +506,7 @@ def write_project(version, project, filepath):
 
     if version <= 9.0:
         xml_project = generate_xml_vc8(version, project)
-        xml_filters
+        xml_filters = None
     else:
         xml_project = generate_xml_vc10(version, project)
         xml_filters = generate_filters_vc10(version, project)
@@ -573,7 +624,7 @@ def _make_test_files(testroot, projects):
 def test():
     variants = ['Debug', 'Release']
     archs = ['Win32', 'x64']
-    version = 9.0
+    version = 12.0
     sln_name = 'testsolution.sln'
     projects, dependencies = _get_test_projects(variants, archs, version)
 
