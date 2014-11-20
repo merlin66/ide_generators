@@ -203,6 +203,14 @@ class Project():
                 pass
         return dict()
 
+def _strip_folder(subfolder, strip_path):
+    if strip_path is None:
+        return subfolder
+    strip_path = strip_path.replace('/', '\\') # TODO: slash consistency
+    assert subfolder.startswith(strip_path)
+    result = subfolder[len(strip_path)+1:]
+    return result
+
 def _add_file_nodes(parent_node, project):
     filemap = project.files
     project_path = project.filepath
@@ -228,14 +236,6 @@ def _add_file_nodes(parent_node, project):
 
     filetype_first = True
 
-    def strip_folder(subfolder, strip_path):
-        if strip_path is None:
-            return subfolder
-        strip_path = strip_path.replace('/', '\\') # TODO: slash consistency
-        assert subfolder.startswith(strip_path)
-        result = subfolder[len(strip_path)+1:]
-        return result
-
     for f in filemap:
         type_filter = f
         for filepath in filemap[f]:
@@ -243,7 +243,7 @@ def _add_file_nodes(parent_node, project):
             subfolder = None
             if len(result) > 1:
                 subfolder = result[0]
-            subfolder = strip_folder(subfolder, strip_path)
+            subfolder = _strip_folder(subfolder, strip_path)
             if filetype_first:
                 total_filter = type_filter
                 if subfolder:
