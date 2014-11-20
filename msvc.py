@@ -53,7 +53,37 @@ configuration_types = {
     'Utility'        : 10,
 }
 
-configuration_tools = {
+project_property_map = {
+    'Makefile'                   : 'make_properties',
+}
+
+tools_map_vc8 = {
+    'make_properties' : 'VCNMakeTool',
+}
+
+tools_reverse_map_vc8 = {}
+for k in tools_map_vc8.keys():
+    tools_reverse_map_vc8[tools_map_vc8[k]] = k
+
+properties_map_vc8 = {
+    'build_command_line'         : 'BuildCommandLine',
+    'clean_command_line'         : 'CleanCommandLine',
+    'rebuild_command_line'       : 'RebuildCommandLine',
+    'output'                     : 'Output',
+    'preprocessor_definitions'   : 'PreprocessorDefinitions',
+    'include_search_path'        : 'IncludeSearchPath',
+}
+
+properties_map_vc10 = {
+    'build_command_line'         : 'NMakeBuildCommandLine',
+    'clean_command_line'         : 'NMakeCleanCommandLine',
+    'rebuild_command_line'       : 'NMakeReBuildCommandLine',
+    'output'                     : 'NMakeOutput',
+    'preprocessor_definitions'   : 'NMakePreprocessorDefinitions',
+    'include_search_path'        : 'NMakeIncludeSearchPath',
+}
+
+configuration_tools_vc8 = {
     'Makefile' : [
                 "VCNMakeTool"
     ],
@@ -264,10 +294,17 @@ def write_project(version, project, out):
                 UseOfMFC = "0",
                 ATLMinimizesCRunTimeLibraryUsage = "false",
             )
-            tools = configuration_tools[project.configuration_type]
+            tools = configuration_tools_vc8[project.configuration_type]
             for tool in tools:
-                d = project.get_tool_info(tool, variant, arch)
-                tool = ET.SubElement(configuration, 'Tool', Name = tool, **d)
+                try:
+                    mapped_tool = tools_reverse_map_vc8[tool]
+                except KeyError:
+                    mapped_tool = tool
+                d = project.get_tool_info(mapped_tool, variant, arch)
+                mapped_dict = {}
+                for k in d.keys():
+                    mapped_dict[properties_map_vc8[k]] = d[k]
+                tool_element = ET.SubElement(configuration, 'Tool', Name = tool, **d)
 
     references = ET.SubElement(xml_project, 'References')
     files = ET.SubElement(xml_project, 'Files')
@@ -327,10 +364,11 @@ def write_solution(version, projects, variants, archs, dependencies, out):
 
 
 #====== Code for testing ======
-def _get_test_projects(variants, archs):
+def _get_test_projects(variants, archs, version):
+    ext = 'vcproj' if version <= 9.0 else 'vcxproj'
     project_files = [
-        'test.vcproj',
-        'testfolder/test2.vcproj',
+        'test.%s' % ext,
+        'testfolder/test2.%s' % ext,
     ]
     files = {
         'src'     : ['testfolder/main.cpp'],
@@ -341,18 +379,24 @@ def _get_test_projects(variants, archs):
         ''         : ['README.txt']
     }
 
-
     project_info = {
         'project_type' : 'Makefile',
-        #'project_type' : 'Application',
 
-        'VCNMakeTool' : dict(
-            BuildCommandLine="scons.bat",
-            CleanCommandLine="scons.bat -c",
-            RebuildCommandLine="scons.bat -c && scons.bat",
-            Output="foo.exe",
-            PreprocessorDefinitions="FOO;BAR",
-            IncludeSearchPath="C:/foo",
+        'make_properties|Win32' : dict(
+            build_command_line="scons.bat",
+            clean_command_line="scons.bat -c",
+            rebuild_command_line="scons.bat -c && scons.bat",
+            output="foo.exe",
+            preprocessor_definitions="FOO;BAR",
+            include_search_path="C:/foo",
+            ),
+        'make_properties|x64' : dict(
+            build_command_line="scons.bat",
+            clean_command_line="scons.bat -c",
+            rebuild_command_line="scons.bat -c && scons.bat",
+            output="foo.exe",
+            preprocessor_definitions="FOO;BAR",
+            include_search_path="C:/foo",
             ),
     }
 
@@ -388,7 +432,7 @@ def test():
     archs = ['Win32', 'x64']
     version = 9.0
     sln_name = 'testsolution.sln'
-    projects, dependencies = _get_test_projects(variants, archs)
+    projects, dependencies = _get_test_projects(variants, archs, version)
 
     testroot = 'temp'
     _make_test_files(testroot, projects)
