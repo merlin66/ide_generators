@@ -203,7 +203,11 @@ class Project():
                 pass
         return dict()
 
-def _add_file_nodes(parent_node, filemap, project_path, src_root, strip_path):
+def _add_file_nodes(parent_node, project):
+    filemap = project.files
+    project_path = project.filepath
+    src_root = project.src_root
+    strip_path = project.strip_path
     filters = { '' : parent_node } # Parent of the empty filter
     def get_filterparent(total_filter):
         assert total_filter != '/', 'Illegal input'
@@ -306,7 +310,7 @@ def generate_xml_vc8(version, project):
     references = ET.SubElement(xml_project, 'References')
     files = ET.SubElement(xml_project, 'Files')
     if project.files:
-        _add_file_nodes(parent_node = files, filemap = project.files, project_path = project.filepath, src_root = project.src_root, strip_path = project.strip_path)
+        _add_file_nodes(parent_node = files, project = project)
 
     xml_globals = ET.SubElement(xml_project, 'Globals')
     return xml_project
