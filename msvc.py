@@ -41,6 +41,8 @@ sln_headers = {
     8.0  : "Microsoft Visual Studio Solution File, Format Version 9.00\n# Visual Studio 2005\n",
     9.0  : "Microsoft Visual Studio Solution File, Format Version 10.00\n# Visual Studio 2008\n",
     10.0 : "Microsoft Visual Studio Solution File, Format Version 11.00\n# Visual Studio 2010\n",
+    11.0 : "Microsoft Visual Studio Solution File, Format Version 12.00\n# Visual Studio 2012\n",
+    12.0 : "Microsoft Visual Studio Solution File, Format Version 13.00\n# Visual Studio 2013\n",
 }
 
 configuration_types = {
