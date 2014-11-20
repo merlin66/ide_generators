@@ -265,10 +265,7 @@ def _add_file_nodes(parent_node, filemap, project_path, src_root, strip_path):
         #TODO: are projects without files valid?
         pass
 
-def write_project(version, project, out):
-    encoding = 'utf-8'
-    pretty = True
-
+def generate_xml_vc8(version, project):
     xml_project = ET.Element('VisualStudioProject',
         ProjectType            = 'Visual C++',
         Version                = '{0:.2f}'.format(version),
@@ -312,15 +309,157 @@ def write_project(version, project, out):
         _add_file_nodes(parent_node = files, filemap = project.files, project_path = project.filepath, src_root = project.src_root, strip_path = project.strip_path)
 
     xml_globals = ET.SubElement(xml_project, 'Globals')
+    return xml_project
 
-    # == write resulting xml ==
+def get_file_groups(filemap):
+    text_files = []
+    header_files= []
+    cl_files = []
+    header_extensions = set(['.h', '.hpp', '.hxx', 'txx'])
+    cl_extensions = set(['.c', '.cpp', '.cxx'])
+    for key in filemap.keys():
+        for file in filemap[key]:
+            ext = os.path.splitext(file)[1].lower()
+            if ext in cl_extensions:
+                cl_files.append(file)
+            elif ext in header_extensions:
+                header_files.append(file)
+            else:
+                text_files.append(file)
+    return text_files, header_files, cl_files
+
+def generate_xml_vc10(version, project):
+    xml_project = ET.Element('Project',
+        DefaultTargets="Build",
+        ToolsVersion="4.0",
+        xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
+    )
+    # Configurations
+    configurations = ET.SubElement(xml_project, 'ItemGroup', Label='ProjectConfigurations')
+    for arch in project.archs:
+        for variant in project.variants:
+            node = ET.SubElement(configurations, 'ProjectConfiguration',
+                Include='%s|%s' % (variant, arch))
+            configuration = ET.SubElement(node, 'Configuration')
+            configuration.text = variant
+            platform = ET.SubElement(node, 'Platform')
+            platform.text = arch
+    # Globals
+    globals = ET.SubElement(xml_project, 'PropertyGroup', Label='Globals')
+    project_guid = ET.SubElement(globals, 'ProjectGuid')
+    project_guid.text = project.guid
+    keyword = ET.SubElement(globals, 'Keyword')
+    keyword.text = 'MakeFileProj' # Hard coded
+    # Default properties
+    default_props = ET.SubElement(xml_project, 'Import', Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props")
+    # Configuration properties
+    for arch in project.archs:
+        for variant in project.variants:
+            pg = ET.SubElement(xml_project, 'PropertyGroup',
+                Condition="'$(Configuration)|$(Platform)'=='%s|%s'" % (variant, arch),
+                Label='Configuration')
+            ct = ET.SubElement(pg, 'ConfigurationType')
+            ct.text = 'Makefile' # Hard coded
+            db = ET.SubElement(pg, 'UseDebugLibraries')
+            db.text = 'false' # Hard coded
+            ts = ET.SubElement(pg, 'PlatformToolset')
+            ts.text = 'v110' # Hard coded
+    # Cpp props
+    cpp_props = ET.SubElement(xml_project, 'Import', Project="$(VCTargetsPath)\Microsoft.Cpp.props")
+    # ExtensionSettings
+    ext_settings = ET.SubElement(xml_project, 'ImportGroup', Label='ExtensionSettings')
+    # PropertySheets
+    for arch in project.archs:
+        for variant in project.variants:
+            ig = ET.SubElement(xml_project, 'ImportGroup', Label='PropertySheets',
+                Condition="'$(Configuration)|$(Platform)'=='%s|%s'" % (variant, arch))
+            node = ET.SubElement(ig, 'Import', Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props",
+                Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')",
+                Label="LocalAppDataPlatform")
+    # UserMacros
+    user_macros = ET.SubElement(xml_project, 'PropertyGroup', Label='UserMacros')
+    # Configuration properties
+    for arch in project.archs:
+        for variant in project.variants:
+            pg = ET.SubElement(xml_project, 'PropertyGroup',
+                Condition="'$(Configuration)|$(Platform)'=='%s|%s'" % (variant, arch))
+            d = project.get_tool_info('make_properties', variant, arch)
+            for key in properties_map_vc10:
+                toolname = properties_map_vc10[key]
+                info = ET.SubElement(pg, toolname)
+                info.text = d[key]
+    # ItemDefinitionGroup
+    idg = ET.SubElement(xml_project, 'ItemDefinitionGroup')
+
+    filemap = project.files
+    text_files, header_files, cl_files = get_file_groups(filemap)
+
+    # Text, ClCompile and ClInclude files
+    ig = ET.SubElement(xml_project, 'ItemGroup')
+    for p in text_files:
+        node = ET.SubElement(ig, 'Text', Include = p)
+    ig = ET.SubElement(xml_project, 'ItemGroup')
+    for p in cl_files:
+        node = ET.SubElement(ig, 'ClCompile', Include = p)
+    ig = ET.SubElement(xml_project, 'ItemGroup')
+    for p in header_files:
+        node = ET.SubElement(ig, 'ClInclude', Include = p)
+
+    # targets
+    targets = ET.SubElement(xml_project, 'Import', Project="$(VCTargetsPath)\Microsoft.Cpp.targets")
+    # extension targets
+    targets = ET.SubElement(xml_project, 'ImportGroup', Label="ExtensionTargets")
+    return xml_project
+
+def generate_filters_vc10(version, project):
+    xml_project = ET.Element('Project', ToolsVersion="4.0", xmlns="http://schemas.microsoft.com/developer/msbuild/2003")
+
+    # First define the set of filters, and list the extensions for each filter
+    filemap = project.files
+    text_files, header_files, cl_files = get_file_groups(filemap)
+
+    # For each text file, list the file and its filter (if it has one)
+    ig = ET.SubElement(xml_project, 'ItemGroup')
+    for t in text_files:
+        node = ET.SubElement(ig, 'Text', Include=t)
+
+    # For each ClCompile file, list the file and its filter
+    ig = ET.SubElement(xml_project, 'ItemGroup')
+    for c in cl_files:
+        node = ET.SubElement(ig, 'ClCompile', Include=c)
+
+    # For each ClInclude file, list the file and its filter
+    ig = ET.SubElement(xml_project, 'ItemGroup')
+    for h in header_files:
+        node = ET.SubElement(ig, 'ClInclude', Include=h)
+        # if filter:
+    return xml_project
+
+def write_xml(xml, filepath, encoding, pretty):
     if pretty:
-        s = ET.tostring(xml_project)
-        out.write(minidom.parseString(s).toprettyxml(encoding = encoding))
+        s = ET.tostring(xml)
+        with open(filepath, 'w') as out:
+            out.write(minidom.parseString(s).toprettyxml(encoding = encoding))
     else:
-        doc = ET.ElementTree(xml_project)
+        doc = ET.ElementTree(xml)
         out.write('<?xml version="1.0" encoding="%s"?>\n' % encoding)
         doc.write(out, encoding = encoding)
+
+def write_project(version, project, filepath):
+    encoding = 'utf-8'
+    pretty = True
+
+    if version <= 9.0:
+        xml_project = generate_xml_vc8(version, project)
+        xml_filters
+    else:
+        xml_project = generate_xml_vc10(version, project)
+        xml_filters = generate_filters_vc10(version, project)
+
+    # == write resulting xml ==
+    write_xml(xml_project, filepath, encoding, pretty)
+    if xml_filters:
+        write_xml(xml_filters, filepath + '.filters', encoding, pretty)
 
 def write_solution(version, projects, variants, archs, dependencies, out):
     out.write(sln_headers[version])
@@ -448,11 +587,9 @@ def test():
     print 'Created %s' % sln_name
 
     for project in projects:
-        out = open(os.path.join(testroot, project.filepath), 'w')
         write_project(version = version,
                       project = project,
-                      out = out)
-        out.close()
+                      filepath = os.path.join(testroot, project.filepath))
         print 'Created %s' % project.filepath
 
 if __name__ == '__main__':
