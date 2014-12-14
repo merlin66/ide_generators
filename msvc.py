@@ -335,7 +335,7 @@ def get_file_groups(filemap):
 def generate_xml_vc10(version, project):
     xml_project = ET.Element('Project',
         DefaultTargets="Build",
-        ToolsVersion="4.0",
+        ToolsVersion="12.0",
         xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
     )
     # Configurations
