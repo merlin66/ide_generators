@@ -460,9 +460,17 @@ def generate_filters_vc10(version, project):
             filter_map[filepath] = total_filter
             filters.add(total_filter)
 
+            # If a filter 'foo\bar\chi' exists, we also have to make sure
+            # the filters 'foo' and  'foo\bar' exists. So generate any
+            # missing filters:
+            components = total_filter.split('\\')
+            for i in range(0, len(components) - 1):
+                subfilter = '\\'.join(components[0:i])
+                filters.add(subfilter)
+
     # First define the set of filters (can list the extensions for each filter)
     ig = ET.SubElement(xml_project, 'ItemGroup')
-    for filter in filters:
+    for filter in sorted(filters):
         if filter == '':
             continue
         fn = ET.SubElement(ig, 'Filter', Include = filter)
