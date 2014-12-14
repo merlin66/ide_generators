@@ -400,7 +400,7 @@ def generate_xml_vc10(version, project):
 
     # Text, ClCompile and ClInclude files
     groups = {
-        'Text' : text_files,
+        'None' : text_files,
         'ClCompile' : cl_files,
         'ClInclude' : header_files,
     }
@@ -478,7 +478,7 @@ def generate_filters_vc10(version, project):
         uid.text = _generateGUID(project.filepath, filter)
 
     groups = {
-        'Text' : text_files,
+        'None' : text_files,
         'ClCompile' : cl_files,
         'ClInclude' : header_files,
     }
