@@ -305,7 +305,7 @@ def generate_xml_vc8(version, project):
                 mapped_dict = {}
                 for k in d.keys():
                     mapped_dict[properties_map_vc8[k]] = d[k]
-                tool_element = ET.SubElement(configuration, 'Tool', Name = tool, **d)
+                tool_element = ET.SubElement(configuration, 'Tool', Name = tool, **mapped_dict)
 
     references = ET.SubElement(xml_project, 'References')
     files = ET.SubElement(xml_project, 'Files')
