@@ -335,7 +335,7 @@ def get_file_groups(filemap):
 def generate_xml_vc10(version, project):
     xml_project = ET.Element('Project',
         DefaultTargets="Build",
-        ToolsVersion="12.0",
+        ToolsVersion="4.0",
         xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
     )
     # Configurations
@@ -464,7 +464,7 @@ def generate_filters_vc10(version, project):
             # the filters 'foo' and  'foo\bar' exists. So generate any
             # missing filters:
             components = total_filter.split('\\')
-            for i in range(0, len(components) - 1):
+            for i in range(1, len(components)):
                 subfilter = '\\'.join(components[0:i])
                 filters.add(subfilter)
 
@@ -505,12 +505,13 @@ def write_xml(xml, filepath, encoding, pretty):
             out.write(minidom.parseString(s).toprettyxml(encoding = encoding))
     else:
         doc = ET.ElementTree(xml)
-        out.write('<?xml version="1.0" encoding="%s"?>\n' % encoding)
-        doc.write(out, encoding = encoding)
+        with open(filepath, 'w') as out:
+            out.write('<?xml version="1.0" encoding="%s"?>\n' % encoding)
+            doc.write(out, encoding = encoding)
 
 def write_project(version, project, filepath):
     encoding = 'utf-8'
-    pretty = True
+    pretty = False
 
     if version <= 9.0:
         xml_project = generate_xml_vc8(version, project)
