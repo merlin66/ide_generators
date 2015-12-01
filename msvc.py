@@ -98,6 +98,8 @@ user_map_vc10 = {
     'working_directory'          : 'LocalDebuggerWorkingDirectory',
     'debugger_flavor'            : 'DebuggerFlavor',
     'debugger_command'           : 'LocalDebuggerCommand',
+    'debugger_environment'       : 'LocalDebuggerEnvironment',
+    'debugger_arguments'         : 'LocalDebuggerCommandArguments',
 }
 
 configuration_tools_vc8 = {
@@ -573,7 +575,7 @@ def write_project(version, project, filepath):
     if xml_user:
         write_xml(xml_user, filepath + '.user', encoding, pretty)
 
-def write_solution(version, projects, variants, archs, dependencies, out):
+def write_solution(version, projects, variants, archs, dependencies, out, solution_items = None):
     out.write(sln_headers[version])
     for project in projects:
         filepath = project.filepath
@@ -589,8 +591,16 @@ def write_solution(version, projects, variants, archs, dependencies, out):
             out.write('\tEndProjectSection')
         out.write('EndProject\n')
 
-    out.write('Global\n')
+    if (version > 10) and solution_items:
+        out.write('Project("%s") = "%s", "%s", "%s"\n' % ('{2150E333-8FDC-42A3-9474-1A3956D46DE8}', 'Solution Items',
+                                                          'Solution Items', guid))
+        out.write('\tProjectSection(SolutionItems) = preProject\n')
+        for item in solution_items:
+            out.write('\t\t%s\n' % item)
+        out.write('\tEndProjectSection\n')
+        out.write('EndProject\n')
 
+    out.write('Global\n')
     out.write('\tGlobalSection(SolutionConfigurationPlatforms) = preSolution\n')
     for variant in variants:
         for arch in archs:
