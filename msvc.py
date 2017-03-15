@@ -37,12 +37,23 @@ from xml.dom import minidom
 # From SCons
 external_makefile_guid = '{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}'
 
+# Version numbers and cl.exe version numbers:
+# Visual Studio 2005  8.0 14.00
+# Visual Studio 2008  9.0 15.00
+# Visual Studio 2010 10.0 16.00
+# Visual Studio 2012 11.0 17.00
+# Visual Studio 2013 12.0 18.00
+# Visual Studio 2015 14.0 19.00
+# Visual Studio 2017 15.0 19.10
+
 sln_headers = {
     8.0  : "Microsoft Visual Studio Solution File, Format Version 9.00\n# Visual Studio 2005\n",
     9.0  : "Microsoft Visual Studio Solution File, Format Version 10.00\n# Visual Studio 2008\n",
     10.0 : "Microsoft Visual Studio Solution File, Format Version 11.00\n# Visual Studio 2010\n",
     11.0 : "Microsoft Visual Studio Solution File, Format Version 12.00\n# Visual Studio 2012\n",
-    12.0 : "Microsoft Visual Studio Solution File, Format Version 13.00\n# Visual Studio 2013\n",
+    12.0 : "Microsoft Visual Studio Solution File, Format Version 12.00\n# Visual Studio 2013\n",
+    14.0 : "Microsoft Visual Studio Solution File, Format Version 12.00\n# Visual Studio 2015\n",
+    15.0 : "Microsoft Visual Studio Solution File, Format Version 12.00\n# Visual Studio 2017\n",
 }
 
 configuration_types = {
@@ -81,6 +92,12 @@ properties_map_vc10 = {
     'output'                     : 'NMakeOutput',
     'preprocessor_definitions'   : 'NMakePreprocessorDefinitions',
     'include_search_path'        : 'NMakeIncludeSearchPath',
+}
+
+user_map_vc10 = {
+    'working_directory'          : 'LocalDebuggerWorkingDirectory',
+    'debugger_flavor'            : 'DebuggerFlavor',
+    'debugger_command'           : 'LocalDebuggerCommand',
 }
 
 configuration_tools_vc8 = {
@@ -150,6 +167,12 @@ configuration_tools_vc8 = {
     ],
 }
 
+def get_toolset_version(project, project_version):
+    version = project.toolset_version
+    if version is None:
+        version = project_version
+    return 'v%s0' % int(version)
+
 # From SCons
 def xmlify(s):
     s = s.replace("&", "&amp;") # do this first
@@ -174,7 +197,7 @@ def _generateGUID(slnfile, name):
     return solution
 
 class Project():
-    def __init__(self, filepath, archs, variants, files, project_info, name = None, src_root = None, strip_path = None):
+    def __init__(self, filepath, archs, variants, files, project_info, name = None, src_root = None, strip_path = None, toolset_version = None):
         self.filepath = filepath
         self.archs = archs
         self.variants = variants
@@ -184,17 +207,18 @@ class Project():
         self.name = name
         self.src_root = src_root
         self.strip_path = strip_path
+        self.toolset_version = toolset_version
         if name is None:
             self.name = os.path.splitext(os.path.split(filepath)[-1])[0]
 
         self.guid = _generateGUID(filepath, name)
 
-    def get_tool_info(self, tool, variant, arch):
+    def get_project_info(self, entry, variant, arch):
         possible_keys = [
-            '%s|%s|%s' % (tool, variant, arch),
-            '%s|%s' % (tool,variant),
-            '%s|%s' % (tool,arch),
-            tool,
+            '%s|%s|%s' % (entry, variant, arch),
+            '%s|%s' % (entry, variant),
+            '%s|%s' % (entry, arch),
+            entry,
             ]
         for key in possible_keys:
             try:
@@ -301,7 +325,7 @@ def generate_xml_vc8(version, project):
                     mapped_tool = tools_reverse_map_vc8[tool]
                 except KeyError:
                     mapped_tool = tool
-                d = project.get_tool_info(mapped_tool, variant, arch)
+                d = project.get_project_info(mapped_tool, variant, arch)
                 mapped_dict = {}
                 for k in d.keys():
                     mapped_dict[properties_map_vc8[k]] = d[k]
@@ -335,7 +359,7 @@ def get_file_groups(filemap):
 def generate_xml_vc10(version, project):
     xml_project = ET.Element('Project',
         DefaultTargets="Build",
-        ToolsVersion="4.0",
+        ToolsVersion="4.0" if version <= 12.0 else "14.0",
         xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
     )
     # Configurations
@@ -367,7 +391,7 @@ def generate_xml_vc10(version, project):
             db = ET.SubElement(pg, 'UseDebugLibraries')
             db.text = 'false' # Hard coded
             ts = ET.SubElement(pg, 'PlatformToolset')
-            ts.text = 'v110' # Hard coded
+            ts.text = get_toolset_version(project, version)
     # Cpp props
     cpp_props = ET.SubElement(xml_project, 'Import', Project="$(VCTargetsPath)\Microsoft.Cpp.props")
     # ExtensionSettings
@@ -387,7 +411,8 @@ def generate_xml_vc10(version, project):
         for variant in project.variants:
             pg = ET.SubElement(xml_project, 'PropertyGroup',
                 Condition="'$(Configuration)|$(Platform)'=='%s|%s'" % (variant, arch))
-            d = project.get_tool_info('make_properties', variant, arch)
+
+            d = project.get_project_info('make_properties', variant, arch)
             for key in properties_map_vc10:
                 toolname = properties_map_vc10[key]
                 info = ET.SubElement(pg, toolname)
@@ -419,6 +444,25 @@ def generate_xml_vc10(version, project):
     targets = ET.SubElement(xml_project, 'Import', Project="$(VCTargetsPath)\Microsoft.Cpp.targets")
     # extension targets
     targets = ET.SubElement(xml_project, 'ImportGroup', Label="ExtensionTargets")
+    return xml_project
+
+def generate_user_vc10(version, project):
+    xml_project = ET.Element('Project',
+        ToolsVersion='4.0' if version <= 12.0 else '14.0',
+        xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
+    )
+    # User properties
+    for arch in project.archs:
+        for variant in project.variants:
+            d = project.get_project_info('user_properties', variant, arch)
+            if d:
+                pg = ET.SubElement(xml_project, 'PropertyGroup',
+                Condition="'$(Configuration)|$(Platform)'=='%s|%s'" % (variant, arch))
+                for key in user_map_vc10:
+                    if d.get(key):
+                        vc_name = user_map_vc10[key]
+                        info = ET.SubElement(pg, vc_name)
+                        info.text = d[key]
     return xml_project
 
 def generate_filters_vc10(version, project):
@@ -516,14 +560,18 @@ def write_project(version, project, filepath):
     if version <= 9.0:
         xml_project = generate_xml_vc8(version, project)
         xml_filters = None
+        xml_user = None
     else:
         xml_project = generate_xml_vc10(version, project)
         xml_filters = generate_filters_vc10(version, project)
+        xml_user    = generate_user_vc10(version, project)
 
     # == write resulting xml ==
     write_xml(xml_project, filepath, encoding, pretty)
     if xml_filters:
         write_xml(xml_filters, filepath + '.filters', encoding, pretty)
+    if xml_user:
+        write_xml(xml_user, filepath + '.user', encoding, pretty)
 
 def write_solution(version, projects, variants, archs, dependencies, out):
     out.write(sln_headers[version])
