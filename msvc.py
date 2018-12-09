@@ -192,7 +192,7 @@ def _generateGUID(slnfile, name):
     # Normalize the slnfile path to a Windows path (\ separators) so
     # the generated file has a consistent GUID even if we generate
     # it on a non-Windows platform.
-    m.update(ntpath.normpath(str(slnfile)) + str(name))
+    m.update((ntpath.normpath(str(slnfile)) + str(name)).encode('utf-8'))
     solution = m.hexdigest().upper()
     # convert most of the signature to GUID form (discard the rest)
     solution = "{" + solution[:8] + "-" + solution[8:12] + "-" + solution[12:16] + "-" + solution[16:20] + "-" + solution[20:32] + "}"
@@ -706,13 +706,13 @@ def test():
                    dependencies = dependencies,
                    out = out)
     out.close()
-    print 'Created %s' % sln_name
+    print('Created %s' % sln_name)
 
     for project in projects:
         write_project(version = version,
                       project = project,
                       filepath = os.path.join(testroot, project.filepath))
-        print 'Created %s' % project.filepath
+        print('Created %s' % project.filepath)
 
 if __name__ == '__main__':
     test()
