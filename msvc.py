@@ -26,6 +26,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+import codecs
 import hashlib
 import ntpath
 import os
@@ -547,13 +548,21 @@ def generate_filters_vc10(version, project):
 def write_xml(xml, filepath, encoding, pretty):
     if pretty:
         s = ET.tostring(xml)
-        with open(filepath, 'w') as out:
+        with codecs.open(filepath, 'w', encoding = encoding) as out:
             out.write(minidom.parseString(s).toprettyxml(encoding = encoding))
     else:
         doc = ET.ElementTree(xml)
-        with open(filepath, 'w') as out:
-            out.write('<?xml version="1.0" encoding="%s"?>\n' % encoding)
-            doc.write(out, encoding = encoding)
+
+        if sys.version_info < (3, 0):
+            with codecs.open(filepath, 'w', encoding = encoding) as out:
+                # Manually adds utf8 tag, then uses doc.write.
+                out.write('<?xml version="1.0" encoding="%s"?>\n' % encoding)
+                doc.write(out, encoding = encoding)
+        else:
+            # doc.write doesn't work with python 3 due to some weird interference
+            # with scons and file writing.
+            # This leaves out the encoding tag.
+            doc.write(filepath, encoding = encoding)
 
 def write_project(version, project, filepath):
     encoding = 'utf-8'
