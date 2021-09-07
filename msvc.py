@@ -170,10 +170,10 @@ configuration_tools_vc8 = {
     ],
 }
 
-def get_toolset_version(project, project_version):
+def get_toolset_version(project):
     version = project.toolset_version
     if version is None:
-        version = project_version
+        version = project.version
     return 'v%s0' % int(version)
 
 # From SCons
@@ -200,7 +200,7 @@ def _generateGUID(slnfile, name):
     return solution
 
 class Project():
-    def __init__(self, filepath, archs, variants, files, project_info, name = None, src_root = None, strip_path = None, toolset_version = None):
+    def __init__(self, filepath, archs, variants, files, project_info, name = None, src_root = None, strip_path = None, version = None, toolset_version = None):
         self.filepath = filepath
         self.archs = archs
         self.variants = variants
@@ -210,6 +210,7 @@ class Project():
         self.name = name
         self.src_root = src_root
         self.strip_path = strip_path
+        self.version = version
         self.toolset_version = toolset_version
         if name is None:
             self.name = os.path.splitext(os.path.split(filepath)[-1])[0]
@@ -296,10 +297,10 @@ def _add_file_nodes(parent_node, project):
         #TODO: are projects without files valid?
         pass
 
-def generate_xml_vc8(version, project):
+def generate_xml_vc8(project):
     xml_project = ET.Element('VisualStudioProject',
         ProjectType            = 'Visual C++',
-        Version                = '{0:.2f}'.format(version),
+        Version                = '{0:.2f}'.format(project.version),
         name                   = project.name,
         ProjectGUID            = project.guid,
         TargetFrameworkVersion = '131072'
@@ -359,10 +360,10 @@ def get_file_groups(filemap):
                 text_files.append(file)
     return text_files, header_files, cl_files
 
-def generate_xml_vc10(version, project):
+def generate_xml_vc10(project):
     xml_project = ET.Element('Project',
         DefaultTargets="Build",
-        ToolsVersion="4.0" if version <= 12.0 else "14.0",
+        ToolsVersion="4.0" if project.version <= 12.0 else "14.0",
         xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
     )
     # Configurations
@@ -394,7 +395,7 @@ def generate_xml_vc10(version, project):
             db = ET.SubElement(pg, 'UseDebugLibraries')
             db.text = 'false' # Hard coded
             ts = ET.SubElement(pg, 'PlatformToolset')
-            ts.text = get_toolset_version(project, version)
+            ts.text = get_toolset_version(project)
     # Cpp props
     cpp_props = ET.SubElement(xml_project, 'Import', Project="$(VCTargetsPath)\Microsoft.Cpp.props")
     # ExtensionSettings
@@ -449,9 +450,9 @@ def generate_xml_vc10(version, project):
     targets = ET.SubElement(xml_project, 'ImportGroup', Label="ExtensionTargets")
     return xml_project
 
-def generate_user_vc10(version, project):
+def generate_user_vc10(project):
     xml_project = ET.Element('Project',
-        ToolsVersion='4.0' if version <= 12.0 else '14.0',
+        ToolsVersion='4.0' if project.version <= 12.0 else '14.0',
         xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
     )
     # User properties
@@ -468,7 +469,7 @@ def generate_user_vc10(version, project):
                         info.text = d[key]
     return xml_project
 
-def generate_filters_vc10(version, project):
+def generate_filters_vc10(project):
     xml_project = ET.Element('Project', ToolsVersion="4.0", xmlns="http://schemas.microsoft.com/developer/msbuild/2003")
 
     filemap = project.files
@@ -564,18 +565,18 @@ def write_xml(xml, filepath, encoding, pretty):
             # This leaves out the encoding tag.
             doc.write(filepath, encoding = encoding)
 
-def write_project(version, project, filepath):
+def write_project(project, filepath):
     encoding = 'utf-8'
-    pretty = False
+    pretty = True
 
-    if version <= 9.0:
-        xml_project = generate_xml_vc8(version, project)
+    if project.version <= 9.0:
+        xml_project = generate_xml_vc8(project)
         xml_filters = None
         xml_user = None
     else:
-        xml_project = generate_xml_vc10(version, project)
-        xml_filters = generate_filters_vc10(version, project)
-        xml_user    = generate_user_vc10(version, project)
+        xml_project = generate_xml_vc10(project)
+        xml_filters = generate_filters_vc10(project)
+        xml_user    = generate_user_vc10(project)
 
     # == write resulting xml ==
     write_xml(xml_project, filepath, encoding, pretty)
@@ -634,7 +635,7 @@ def write_solution(version, projects, variants, archs, dependencies, out, soluti
 
 
 #====== Code for testing ======
-def _get_test_projects(variants, archs, version):
+def _get_test_projects(variants, archs, version, toolset_version):
     ext = 'vcproj' if version <= 9.0 else 'vcxproj'
     project_files = [
         'test.%s' % ext,
@@ -674,6 +675,8 @@ def _get_test_projects(variants, archs, version):
                          variants = variants,
                          archs = archs,
                          files = files,
+                         version = version,
+                         toolset_version = toolset_version,
                          project_info = project_info,
                          ) for p in project_files ]
 
@@ -700,9 +703,10 @@ def _make_test_files(testroot, projects):
 def test():
     variants = ['Debug', 'Release']
     archs = ['Win32', 'x64']
-    version = 12.0
+    version = 15.0
+    toolset_version = 14.2
     sln_name = 'testsolution.sln'
-    projects, dependencies = _get_test_projects(variants, archs, version)
+    projects, dependencies = _get_test_projects(variants, archs, version, toolset_version)
 
     testroot = 'temp'
     _make_test_files(testroot, projects)
@@ -718,8 +722,7 @@ def test():
     print('Created %s' % sln_name)
 
     for project in projects:
-        write_project(version = version,
-                      project = project,
+        write_project(project = project,
                       filepath = os.path.join(testroot, project.filepath))
         print('Created %s' % project.filepath)
 
