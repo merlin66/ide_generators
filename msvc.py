@@ -174,7 +174,7 @@ def get_toolset_version(project):
     version = project.toolset_version
     if version is None:
         version = project.version
-    return 'v%s0' % int(version)
+    return 'v%s' % int(version * 10)
 
 # From SCons
 def xmlify(s):
