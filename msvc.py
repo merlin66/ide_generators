@@ -550,7 +550,7 @@ def write_xml(xml, filepath, encoding, pretty):
     if pretty:
         s = ET.tostring(xml)
         with codecs.open(filepath, 'w', encoding = encoding) as out:
-            out.write(minidom.parseString(s).toprettyxml(encoding = encoding))
+            out.write(minidom.parseString(s).toprettyxml())
     else:
         doc = ET.ElementTree(xml)
 
